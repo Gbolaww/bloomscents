@@ -43,6 +43,8 @@ func main() {
 
 	// Admin-only
 	mux.HandleFunc("/api/admin/orders", withCORS(requireAuth("admin", handleAdminListOrders)))
+	mux.HandleFunc("/api/admin/products", withCORS(requireAuth("admin", handleAdminCreateProduct)))
+	mux.HandleFunc("/api/admin/products/", withCORS(requireAuth("admin", handleAdminProductByID)))
 
 	// Serve the PWA frontend from the files embedded in this binary
 	frontendRoot, err := fs.Sub(frontendFiles, "frontend")

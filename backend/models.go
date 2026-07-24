@@ -26,15 +26,20 @@ type Product struct {
 	InStock     bool   `json:"in_stock"`
 }
 
+type OrderItem struct {
+	ProductID   int    `json:"product_id"`
+	ProductName string `json:"product_name,omitempty"`
+	Quantity    int    `json:"quantity"`
+	PriceKobo   int    `json:"price_kobo"`
+}
+
 type Order struct {
-	ID                int       `json:"id"`
-	CustomerID        int       `json:"customer_id"`
-	ProductID         int       `json:"product_id"`
-	ProductName       string    `json:"product_name,omitempty"`
-	Quantity          int       `json:"quantity"`
-	AmountKobo        int       `json:"amount_kobo"`
-	PaystackReference string    `json:"paystack_reference"`
-	Status            string    `json:"status"`
-	DeliveryAddress   string    `json:"delivery_address"`
-	CreatedAt         time.Time `json:"created_at"`
+	ID                int         `json:"id"`
+	CustomerID        int         `json:"customer_id"`
+	Items             []OrderItem `json:"items,omitempty"`
+	TotalAmountKobo   int         `json:"total_amount_kobo"`
+	PaystackReference string      `json:"paystack_reference"`
+	Status            string      `json:"status"`
+	DeliveryAddress   string      `json:"delivery_address"`
+	CreatedAt         time.Time   `json:"created_at"`
 }

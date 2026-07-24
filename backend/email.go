@@ -26,10 +26,15 @@ func sendAdminOrderNotification(order Order) {
 		return
 	}
 
-	subject := "New Bloom Scents order — " + order.ProductName
+	itemsSummary := ""
+	for _, item := range order.Items {
+		itemsSummary += fmt.Sprintf("  - %s x%d (%.2f NGN each)\n", item.ProductName, item.Quantity, float64(item.PriceKobo)/100)
+	}
+
+	subject := fmt.Sprintf("New Bloom Scents order — #%d", order.ID)
 	body := fmt.Sprintf(
-		"New paid order!\n\nOrder ID: %d\nProduct: %s\nQuantity: %d\nAmount: %.2f NGN\nReference: %s\nDelivery address: %s\n",
-		order.ID, order.ProductName, order.Quantity, float64(order.AmountKobo)/100, order.PaystackReference, order.DeliveryAddress,
+		"New paid order!\n\nOrder ID: %d\nItems:\n%s\nTotal: %.2f NGN\nReference: %s\nDelivery address: %s\n",
+		order.ID, itemsSummary, float64(order.TotalAmountKobo)/100, order.PaystackReference, order.DeliveryAddress,
 	)
 
 	msg := []byte("To: " + adminEmail + "\r\n" +

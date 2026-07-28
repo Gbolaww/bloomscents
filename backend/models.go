@@ -36,6 +36,9 @@ type OrderItem struct {
 type Order struct {
 	ID                int         `json:"id"`
 	CustomerID        int         `json:"customer_id"`
+	CustomerName      string      `json:"customer_name,omitempty"`
+	CustomerEmail     string      `json:"customer_email,omitempty"`
+	CustomerPhone     string      `json:"customer_phone,omitempty"`
 	Items             []OrderItem `json:"items,omitempty"`
 	TotalAmountKobo   int         `json:"total_amount_kobo"`
 	PaystackReference string      `json:"paystack_reference"`

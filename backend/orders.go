@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 type cartItemRequest struct {
@@ -120,11 +122,11 @@ func handleAdminListOrders(w http.ResponseWriter, r *http.Request, adminID int) 
 	writeJSON(w, http.StatusOK, orders)
 }
 
-// loadOrdersWithItems loads orders (optionally filtered) plus their line items.
+// loadOrdersWithItems loads orders (optionally filtered) plus their line items and customer details.
 func loadOrdersWithItems(whereAndOrder string, args ...any) ([]Order, error) {
 	rows, err := db.Query(
-		`SELECT o.id, o.customer_id, o.total_amount_kobo, o.paystack_reference, o.status, o.delivery_address, o.created_at
-		 FROM orders o `+whereAndOrder,
+		`SELECT o.id, o.customer_id, c.full_name, c.email, c.phone, o.total_amount_kobo, o.paystack_reference, o.status, o.delivery_address, o.created_at
+		 FROM orders o JOIN customers c ON c.id = o.customer_id `+whereAndOrder,
 		args...,
 	)
 	if err != nil {
@@ -135,7 +137,7 @@ func loadOrdersWithItems(whereAndOrder string, args ...any) ([]Order, error) {
 	var orders []Order
 	for rows.Next() {
 		var o Order
-		if err := rows.Scan(&o.ID, &o.CustomerID, &o.TotalAmountKobo, &o.PaystackReference, &o.Status, &o.DeliveryAddress, &o.CreatedAt); err != nil {
+		if err := rows.Scan(&o.ID, &o.CustomerID, &o.CustomerName, &o.CustomerEmail, &o.CustomerPhone, &o.TotalAmountKobo, &o.PaystackReference, &o.Status, &o.DeliveryAddress, &o.CreatedAt); err != nil {
 			return nil, err
 		}
 		orders = append(orders, o)
@@ -165,6 +167,97 @@ func loadOrdersWithItems(whereAndOrder string, args ...any) ([]Order, error) {
 	}
 
 	return orders, nil
+}
+
+var validOrderStatuses = map[string]bool{
+	"pending": true, "paid": true, "shipped": true, "delivered": true, "cancelled": true,
+}
+
+type updateStatusRequest struct {
+	Status string `json:"status"`
+}
+
+// PATCH /api/admin/orders/{id}/status  (requires admin auth)
+func handleAdminUpdateOrderStatus(w http.ResponseWriter, r *http.Request, adminID int) {
+	// path is /api/admin/orders/{id}/status
+	path := strings.TrimPrefix(r.URL.Path, "/api/admin/orders/")
+	idStr := strings.TrimSuffix(path, "/status")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid order id", http.StatusBadRequest)
+		return
+	}
+
+	var req updateStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if !validOrderStatuses[req.Status] {
+		http.Error(w, "invalid status value", http.StatusBadRequest)
+		return
+	}
+
+	_, err = db.Exec(`UPDATE orders SET status = $1 WHERE id = $2`, req.Status, id)
+	if err != nil {
+		http.Error(w, "failed to update order status", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"updated": true})
+}
+
+// handleAdminOrderByID dispatches sub-paths under /api/admin/orders/{id}/...
+func handleAdminOrderByID(w http.ResponseWriter, r *http.Request, adminID int) {
+	if strings.HasSuffix(r.URL.Path, "/status") && r.Method == http.MethodPatch {
+		handleAdminUpdateOrderStatus(w, r, adminID)
+		return
+	}
+	http.Error(w, "not found", http.StatusNotFound)
+}
+
+// GET /api/admin/stats  (requires admin auth)
+func handleAdminStats(w http.ResponseWriter, r *http.Request, adminID int) {
+	var totalOrders int
+	var totalRevenueKobo int
+	var pendingCount, paidCount, shippedCount, deliveredCount int
+
+	db.QueryRow(`SELECT COUNT(*) FROM orders`).Scan(&totalOrders)
+	db.QueryRow(`SELECT COALESCE(SUM(total_amount_kobo), 0) FROM orders WHERE status != 'pending'`).Scan(&totalRevenueKobo)
+	db.QueryRow(`SELECT COUNT(*) FROM orders WHERE status = 'pending'`).Scan(&pendingCount)
+	db.QueryRow(`SELECT COUNT(*) FROM orders WHERE status = 'paid'`).Scan(&paidCount)
+	db.QueryRow(`SELECT COUNT(*) FROM orders WHERE status = 'shipped'`).Scan(&shippedCount)
+	db.QueryRow(`SELECT COUNT(*) FROM orders WHERE status = 'delivered'`).Scan(&deliveredCount)
+
+	type topProduct struct {
+		Name      string `json:"name"`
+		UnitsSold int    `json:"units_sold"`
+	}
+	var topProducts []topProduct
+	rows, err := db.Query(
+		`SELECT p.name, SUM(oi.quantity) as units
+		 FROM order_items oi JOIN products p ON p.id = oi.product_id
+		 GROUP BY p.name ORDER BY units DESC LIMIT 5`,
+	)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var tp topProduct
+			if rows.Scan(&tp.Name, &tp.UnitsSold) == nil {
+				topProducts = append(topProducts, tp)
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"total_orders":       totalOrders,
+		"total_revenue_kobo": totalRevenueKobo,
+		"pending_count":      pendingCount,
+		"paid_count":         paidCount,
+		"shipped_count":      shippedCount,
+		"delivered_count":    deliveredCount,
+		"top_products":       topProducts,
+	})
 }
 
 func markOrderPaid(reference string) (Order, error) {

@@ -497,6 +497,11 @@ function goto(viewId) {
   if (viewId === 'view-account') loadAccount();
   if (viewId === 'view-cart') renderCart();
   if (viewId === 'view-admin-dashboard') { loadAdminStats(); loadAdminOrders(); loadAdminProducts(); }
+  // Remember where we are so a page refresh resumes here instead of restarting onboarding.
+  // Onboarding itself and admin login aren't worth resuming into on refresh.
+  if (viewId !== 'view-onboarding' && viewId !== 'view-admin-login') {
+    sessionStorage.setItem('bloom_last_view', viewId);
+  }
   window.scrollTo(0,0);
 }
 document.querySelectorAll('[data-goto]').forEach(el => {
@@ -961,6 +966,12 @@ if ('serviceWorker' in navigator) {
 // ---- Init ----
 showSlide(0);
 updateCartBadge();
+const lastView = sessionStorage.getItem('bloom_last_view');
+if (lastView && document.getElementById(lastView)) {
+  // Product detail can't be resumed directly since it depends on which product was open —
+  // send those back to the catalog instead of showing a broken/empty detail page.
+  goto(lastView === 'view-detail' ? 'view-home' : lastView);
+}
 </script>
 </body>
 </html>

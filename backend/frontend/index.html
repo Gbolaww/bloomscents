@@ -138,7 +138,7 @@
   .nav-item.active { color: var(--tan); }
 
   /* Product detail */
-  .detail-hero { background: linear-gradient(150deg, #EFE3D2, #E2CDB2); padding: 20px; display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; aspect-ratio: 1/1.05; justify-content: center; }
+  .detail-hero { background: linear-gradient(150deg, #EFE3D2, #E2CDB2); padding: 20px; display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; aspect-ratio: 1/1.05; justify-content: center; overflow: hidden; }
   .back-btn { position: absolute; top: 20px; left: 20px; width: 36px; height: 36px; border-radius: 50%; background: rgba(23,20,15,0.85); display: flex; align-items: center; justify-content: center; color: var(--cream); z-index: 2; }
   .detail-hero .bottle-large { width: 34%; height: 62%; filter: drop-shadow(0 20px 24px rgba(0,0,0,0.25)); }
   .detail-info-bar { padding: 20px; }
@@ -343,9 +343,8 @@
 
   <!-- ===================== PRODUCT DETAIL ===================== -->
   <section class="view" id="view-detail">
-    <div class="detail-hero">
+    <div class="detail-hero" id="detail-hero-frame">
       <div class="back-btn" data-goto="view-home">←</div>
-      <svg class="bottle-large" viewBox="0 0 60 100" fill="none"><rect x="24" y="0" width="12" height="10" rx="1" fill="#141210"/><rect x="20" y="10" width="20" height="9" rx="2" fill="#3a3025"/><path d="M14 27 C14 21 20 19 30 19 C40 19 46 21 46 27 L46 90 C46 96 42 99 30 99 C18 99 14 96 14 90 Z" fill="#E7C9BE" opacity="0.95"/></svg>
     </div>
     <div class="detail-info-bar">
       <h2 id="detail-name">Product Name</h2>
@@ -482,6 +481,14 @@ function bottleSvg(fill) {
 }
 const swatches = ['#E7C9BE', '#C9A876', '#D8DCE0', '#8f6a52', '#E3D6C2', '#B7A8C9'];
 
+// Renders a real product photo if the product has one, otherwise falls back to the illustrated bottle icon.
+function productImageHtml(product, swatchIndex, extraStyle) {
+  if (product && product.image_url) {
+    return `<img src="${product.image_url}" alt="${product.name || ''}" style="width:100%; height:100%; object-fit:cover; ${extraStyle||''}">`;
+  }
+  return bottleSvg(swatches[swatchIndex % swatches.length]);
+}
+
 // ---- NAVIGATION ----
 function goto(viewId) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -603,7 +610,7 @@ async function loadProducts() {
     listEl.innerHTML = products.map((p, idx) => `
       <div class="product-card" data-id="${p.id}">
         <div class="thumb" data-open="${p.id}">
-          ${bottleSvg(swatches[idx % swatches.length])}
+          ${productImageHtml(p, idx)}
           <div class="add-mini" data-quickadd="${p.id}">+</div>
         </div>
         <div class="info" data-open="${p.id}">
@@ -643,6 +650,14 @@ function openDetail(id) {
   document.getElementById('detail-notes').textContent = currentProduct.scent_notes || '';
   document.getElementById('detail-price').textContent = formatNaira(currentProduct.price_kobo);
   document.getElementById('detail-desc').textContent = currentProduct.description || '';
+  const heroFrame = document.getElementById('detail-hero-frame');
+  const idx = products.findIndex(p => p.id === id);
+  if (currentProduct.image_url) {
+    heroFrame.innerHTML = `<div class="back-btn" data-goto="view-home">←</div><img src="${currentProduct.image_url}" alt="${currentProduct.name}" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;">`;
+  } else {
+    heroFrame.innerHTML = `<div class="back-btn" data-goto="view-home">←</div><svg class="bottle-large" viewBox="0 0 60 100" fill="none"><rect x="24" y="0" width="12" height="10" rx="1" fill="#141210"/><rect x="20" y="10" width="20" height="9" rx="2" fill="${swatches[idx % swatches.length]}"/><path d="M14 27 C14 21 20 19 30 19 C40 19 46 21 46 27 L46 90 C46 96 42 99 30 99 C18 99 14 96 14 90 Z" fill="${swatches[idx % swatches.length]}" opacity="0.95"/></svg>`;
+  }
+  heroFrame.querySelector('[data-goto]').addEventListener('click', (e) => { e.preventDefault(); goto('view-home'); });
   goto('view-detail');
 }
 
@@ -665,7 +680,7 @@ document.getElementById('add-to-cart-btn').addEventListener('click', () => {
 function addToCart(product, qty) {
   const existing = cart.find(i => i.id === product.id);
   if (existing) existing.quantity += qty;
-  else cart.push({ id: product.id, name: product.name, price_kobo: product.price_kobo, quantity: qty });
+  else cart.push({ id: product.id, name: product.name, price_kobo: product.price_kobo, image_url: product.image_url, quantity: qty });
   saveCart();
 }
 
@@ -680,7 +695,7 @@ function renderCart() {
   }
   listEl.innerHTML = cart.map((item, idx) => `
     <div class="cart-item">
-      <div class="thumb">${bottleSvg(swatches[idx % swatches.length])}</div>
+      <div class="thumb">${productImageHtml(item, idx)}</div>
       <div class="info">
         <h4>${item.name}</h4>
         <div class="p">${formatNaira(item.price_kobo)}</div>

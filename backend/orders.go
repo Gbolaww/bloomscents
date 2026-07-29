@@ -204,6 +204,13 @@ func handleAdminUpdateOrderStatus(w http.ResponseWriter, r *http.Request, adminI
 		return
 	}
 
+	if req.Status == "shipped" {
+		orders, err := loadOrdersWithItems(`WHERE o.id = $1`, id)
+		if err == nil && len(orders) > 0 {
+			go sendCustomerShippedNotification(orders[0])
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"updated": true})
 }
 

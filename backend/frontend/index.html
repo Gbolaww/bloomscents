@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root {
     --ink: #17140F;
@@ -63,7 +64,11 @@
   .field { margin-bottom: 16px; }
 
   /* ===== Onboarding ===== */
-  #view-onboarding { justify-content: space-between; padding: 40px 28px 36px; background: var(--ink); color: var(--cream); }
+  #view-onboarding {
+    justify-content: space-between; padding: 40px 28px 36px; color: var(--cream);
+    background: linear-gradient(180deg, rgba(20,15,20,0.55), rgba(15,10,15,0.85)), url('hero-bella-vita.jpg');
+    background-size: cover; background-position: center;
+  }
   .ob-slides { position: relative; flex: 1; display: flex; align-items: center; }
   .ob-slide { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 8px; }
   .ob-slide.active { display: flex; }
@@ -87,6 +92,10 @@
   .auth-switch a { font-weight: 700; text-decoration: underline; }
   .auth-skip { text-align: center; margin-top: 22px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
   .auth-admin-link { text-align: center; margin-top: 10px; font-size: 11px; color: rgba(23,20,15,0.3); }
+  .or-divider { text-align: center; color: var(--muted); font-size: 12px; margin: 18px 0 14px; position: relative; }
+  .or-divider::before, .or-divider::after { content: ''; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--line); }
+  .or-divider::before { left: 0; }
+  .or-divider::after { right: 0; }
   .error-msg { color: #8a2f2f; font-size: 13px; margin-top: -8px; margin-bottom: 14px; min-height: 16px; }
 
   /* ===== Top bar ===== */
@@ -254,6 +263,8 @@
         <div class="error-msg" id="login-error"></div>
         <button type="submit" class="btn btn-primary btn-block">Log In</button>
       </form>
+      <div class="or-divider">or</div>
+      <div id="google-signin-login"></div>
       <div class="auth-switch">Don't have an account? <a href="#" data-goto="view-signup">Sign up</a></div>
       <div class="auth-skip" data-goto="view-home">Continue browsing without an account</div>
       <div class="auth-admin-link"><a href="#" data-goto="view-admin-login">Admin login</a></div>
@@ -273,9 +284,12 @@
         <div class="field"><label>Email</label><input type="email" id="signup-email" required placeholder="you@example.com"></div>
         <div class="field"><label>Phone</label><input type="tel" id="signup-phone" placeholder="080..."></div>
         <div class="field"><label>Password</label><input type="password" id="signup-password" required placeholder="••••••••"></div>
+        <div class="field"><label>Confirm Password</label><input type="password" id="signup-password-confirm" required placeholder="••••••••"></div>
         <div class="error-msg" id="signup-error"></div>
         <button type="submit" class="btn btn-primary btn-block">Sign Up</button>
       </form>
+      <div class="or-divider">or</div>
+      <div id="google-signin-signup"></div>
       <div class="auth-switch">Already have an account? <a href="#" data-goto="view-login">Log in</a></div>
     </div>
   </section>
@@ -300,7 +314,7 @@
 
   <!-- ===================== HOME / CATALOG ===================== -->
   <section class="view" id="view-home">
-    <div class="announce">Free delivery on orders over ₦50,000 &nbsp;|&nbsp; Complimentary samples with every order</div>
+    <div class="announce">Free delivery on orders over ₦50,000 &nbsp;|&nbsp; Never go unnoticed again</div>
     <div class="topbar">
       <div><div class="wordmark">BLOOM</div><span class="wordmark-sub">SCENTS</span></div>
       <div class="topbar-actions">
@@ -313,7 +327,7 @@
       <h2>Scents that leave a lasting impression.</h2>
       <p>Luxury fragrances, thoughtfully crafted with the finest ingredients — made to bloom with you.</p>
       <div class="hero-frame">
-        <svg class="hero-bottle" viewBox="0 0 60 100" fill="none"><rect x="24" y="0" width="12" height="10" rx="1" fill="#141210"/><rect x="20" y="10" width="20" height="9" rx="2" fill="#3a3025"/><path d="M14 27 C14 21 20 19 30 19 C40 19 46 21 46 27 L46 90 C46 96 42 99 30 99 C18 99 14 96 14 90 Z" fill="#E7C9BE" opacity="0.95"/></svg>
+        <img src="hero-bella-vita.jpg" alt="Bloom Scents fragrance" style="width:100%; height:100%; object-fit:cover;">
       </div>
     </div>
     <div class="chip-row">
@@ -468,6 +482,10 @@ const WHATSAPP_NUMBER = '2348000000000';
 // then fill these in:
 const CLOUDINARY_CLOUD_NAME = 'idrevqxu'; // e.g. 'dxyz1234'
 const CLOUDINARY_UPLOAD_PRESET = 'bloomscents'; // e.g. 'bloom_unsigned'
+// Sign-In: create an OAuth Client ID at console.cloud.google.com (APIs & Services > Credentials
+// > Create Credentials > OAuth client ID > Web application), add your site's URL under
+// "Authorized JavaScript origins", then paste the client ID here.
+const GOOGLE_CLIENT_ID = '8684346238-0u4q1kik9rgkmp5colcc133js6fd95im.apps.googleusercontent.com';
 
 // ---- STATE ----
 let products = [];
@@ -516,6 +534,13 @@ function showToast(msg) {
 }
 
 function formatNaira(kobo) { return '₦' + (kobo / 100).toLocaleString(); }
+
+// Orders are tagged with a short code derived from their (already random) Paystack reference,
+// instead of the sequential database id, so order numbers aren't guessable/sequential.
+function orderTag(order) {
+  const ref = (order.paystack_reference || '').replace('bloom_', '');
+  return ref ? ref.slice(0, 6).toUpperCase() : String(order.id);
+}
 
 function getToken() { return localStorage.getItem('bloom_token'); }
 function setToken(t) { localStorage.setItem('bloom_token', t); }
@@ -569,8 +594,13 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
   const email = document.getElementById('signup-email').value;
   const phone = document.getElementById('signup-phone').value;
   const password = document.getElementById('signup-password').value;
+  const passwordConfirm = document.getElementById('signup-password-confirm').value;
   const errEl = document.getElementById('signup-error');
   errEl.textContent = '';
+  if (password !== passwordConfirm) {
+    errEl.textContent = 'Passwords do not match.';
+    return;
+  }
   try {
     const res = await fetch(`${API_BASE}/api/signup`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ full_name, email, phone, password }) });
     if (!res.ok) throw new Error();
@@ -584,6 +614,39 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
 });
 
 document.getElementById('logout-btn').addEventListener('click', () => { clearToken(); showToast('Logged out'); goto('view-login'); });
+
+// ---- GOOGLE SIGN-IN ----
+async function handleGoogleCredentialResponse(response) {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: response.credential })
+    });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    setToken(data.token);
+    localStorage.setItem('bloom_name', data.full_name || 'Bloom Customer');
+    localStorage.setItem('bloom_email', data.email || '');
+    showToast('Signed in with Google');
+    goto('view-home');
+  } catch (err) { showToast('Google sign-in failed — try again.'); }
+}
+
+function initGoogleSignIn() {
+  const loginEl = document.getElementById('google-signin-login');
+  const signupEl = document.getElementById('google-signin-signup');
+  if (!GOOGLE_CLIENT_ID || typeof google === 'undefined') {
+    document.querySelectorAll('.or-divider').forEach(el => el.style.display = 'none');
+    if (loginEl) loginEl.style.display = 'none';
+    if (signupEl) signupEl.style.display = 'none';
+    return;
+  }
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredentialResponse });
+  if (loginEl) google.accounts.id.renderButton(loginEl, { theme: 'outline', size: 'large', width: 280, text: 'signin_with' });
+  if (signupEl) google.accounts.id.renderButton(signupEl, { theme: 'outline', size: 'large', width: 280, text: 'signup_with' });
+}
+window.addEventListener('load', () => setTimeout(initGoogleSignIn, 300));
 
 // ---- ADMIN AUTH ----
 document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
@@ -771,7 +834,7 @@ async function loadAccount() {
     historyList.innerHTML = orders.map(o => `
       <div class="order-item">
         <div class="row">
-          <strong>Order #${o.id}</strong>
+          <strong>Order #${orderTag(o)}</strong>
           <span class="status-pill ${o.status === 'paid' ? 'status-paid' : 'status-pending'}">${o.status}</span>
         </div>
         ${(o.items||[]).map(it => `<div class="item-line">${it.product_name} × ${it.quantity}</div>`).join('')}
@@ -795,7 +858,7 @@ async function loadAdminOrders() {
     listEl.innerHTML = orders.map(o => `
       <div class="admin-order-card">
         <div class="row" style="display:flex; justify-content:space-between;">
-          <strong>Order #${o.id}</strong>
+          <strong>Order #${orderTag(o)}</strong>
           <span class="status-pill ${o.status === 'paid' || o.status === 'delivered' ? 'status-paid' : 'status-pending'}">${o.status}</span>
         </div>
         <div class="customer-line"><strong>${o.customer_name || 'Unknown'}</strong> · ${o.customer_email || ''} ${o.customer_phone ? '· ' + o.customer_phone : ''}</div>

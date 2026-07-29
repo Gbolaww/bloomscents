@@ -33,6 +33,7 @@ func main() {
 	mux.HandleFunc("/api/signup", withCORS(handleSignup))
 	mux.HandleFunc("/api/login", withCORS(handleLogin))
 	mux.HandleFunc("/api/admin/login", withCORS(handleAdminLogin))
+	mux.HandleFunc("/api/auth/google", withCORS(handleGoogleAuth))
 	mux.HandleFunc("/api/products", withCORS(handleListProducts))
 	mux.HandleFunc("/api/products/", withCORS(handleGetProduct))
 	mux.HandleFunc("/api/paystack/webhook", withCORS(handlePaystackWebhook))

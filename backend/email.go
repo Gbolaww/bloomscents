@@ -7,6 +7,42 @@ import (
 	"os"
 )
 
+// sendCustomerShippedNotification emails the customer when their order is marked shipped.
+// Uses the same SMTP_* environment variables as the admin notification.
+func sendCustomerShippedNotification(order Order) {
+	host := os.Getenv("SMTP_HOST")
+	port := os.Getenv("SMTP_PORT")
+	user := os.Getenv("SMTP_USER")
+	password := os.Getenv("SMTP_PASSWORD")
+
+	if host == "" || order.CustomerEmail == "" {
+		log.Println("SMTP not configured or customer has no email; skipping shipped notification")
+		return
+	}
+
+	itemsSummary := ""
+	for _, item := range order.Items {
+		itemsSummary += fmt.Sprintf("  - %s x%d\n", item.ProductName, item.Quantity)
+	}
+
+	subject := "Your Bloom Scents order is on its way!"
+	body := fmt.Sprintf(
+		"Hi %s,\n\nGreat news — your order has been shipped and is on its way to you.\n\nItems:\n%s\nDelivery address: %s\n\nThank you for shopping with Bloom Scents!\n",
+		order.CustomerName, itemsSummary, order.DeliveryAddress,
+	)
+
+	msg := []byte("To: " + order.CustomerEmail + "\r\n" +
+		"Subject: " + subject + "\r\n" +
+		"\r\n" + body + "\r\n")
+
+	auth := smtp.PlainAuth("", user, password, host)
+	addr := host + ":" + port
+
+	if err := smtp.SendMail(addr, auth, user, []string{order.CustomerEmail}, msg); err != nil {
+		log.Printf("failed to send customer shipped notification: %v", err)
+	}
+}
+
 // sendAdminOrderNotification emails the admin whenever an order is confirmed paid.
 // Configure these environment variables:
 //
